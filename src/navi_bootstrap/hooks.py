@@ -29,7 +29,7 @@ def run_hooks(hooks: list[str], working_dir: Path) -> list[HookResult]:
         try:
             result = subprocess.run(
                 command,
-                shell=True,  # nosec B602
+                shell=True,  # nosec B602  # nosemgrep: subprocess-shell-true
                 capture_output=True,
                 text=True,
                 cwd=working_dir,

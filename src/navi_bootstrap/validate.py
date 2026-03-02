@@ -41,7 +41,7 @@ def run_validations(validations: list[dict[str, Any]], working_dir: Path) -> lis
         try:
             result = subprocess.run(
                 command,
-                shell=True,  # nosec B602
+                shell=True,  # nosec B602  # nosemgrep: subprocess-shell-true
                 capture_output=True,
                 text=True,
                 cwd=working_dir,

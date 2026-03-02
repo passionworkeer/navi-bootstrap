@@ -154,10 +154,11 @@ def render_to_files(
     Returns a list of RenderedFile with (dest, content, mode). The caller
     decides what to do with them — write to disk, return via HTTP, etc.
     """
-    env = jinja2.Environment(  # nosec B701
+    env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(templates_dir)),
         undefined=jinja2.StrictUndefined,
         keep_trailing_newline=True,
+        autoescape=jinja2.select_autoescape(),
     )
 
     context: dict[str, Any] = {
