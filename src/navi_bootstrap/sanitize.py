@@ -15,7 +15,7 @@ from typing import Any
 from navi_sanitize import clean, jinja2_escaper, path_escaper, walk
 
 
-def _clean_path_and_jinja(value: str) -> str:
+def _clean_path_then_jinja(value: str) -> str:
     """Clean a path field: pipeline + path escaping, then jinja2 escaping.
 
     path_escaper replaces backslashes with forward slashes, so it must run
@@ -24,10 +24,10 @@ def _clean_path_and_jinja(value: str) -> str:
     return jinja2_escaper(clean(value, escaper=path_escaper))
 
 
-def _apply_path_jinja(obj: dict[str, Any], key: str) -> None:
-    """Apply path+jinja2 cleaning to a specific key in a dict, if present and str."""
-    if key in obj and isinstance(obj[key], str):
-        obj[key] = _clean_path_and_jinja(obj[key])
+def _apply_path_jinja(obj: dict[str, Any], key: str, raw: dict[str, Any]) -> None:
+    """Apply path+jinja2 cleaning to a key, reading from raw (unmutated) source."""
+    if key in raw and isinstance(raw[key], str):
+        obj[key] = _clean_path_then_jinja(raw[key])
 
 
 def sanitize_spec(spec_data: dict[str, Any]) -> dict[str, Any]:
@@ -40,27 +40,20 @@ def sanitize_spec(spec_data: dict[str, Any]) -> dict[str, Any]:
     spec: dict[str, Any] = walk(spec_data, escaper=jinja2_escaper)
 
     # Path fields need path escaping applied BEFORE jinja2 escaping.
-    # Re-process these from raw spec_data so path_escaper sees the original
-    # values before jinja2_escaper adds backslash sequences.
-    raw = deepcopy(spec_data)
+    # Read from spec_data (unmutated — walk() returns a new copy) so
+    # path_escaper sees original values before jinja2_escaper's backslashes.
+    _apply_path_jinja(spec, "name", spec_data)
 
-    _apply_path_jinja(raw, "name")
-    if "name" in raw:
-        spec["name"] = raw["name"]
-
-    if isinstance(raw.get("structure"), dict) and isinstance(spec.get("structure"), dict):
+    if isinstance(spec_data.get("structure"), dict) and isinstance(spec.get("structure"), dict):
         for key in ("src_dir", "test_dir", "docs_dir"):
-            _apply_path_jinja(raw["structure"], key)
-            if key in raw["structure"]:
-                spec["structure"][key] = raw["structure"][key]
+            _apply_path_jinja(spec["structure"], key, spec_data["structure"])
 
     # Module names are path-like
-    if isinstance(raw.get("modules"), list) and isinstance(spec.get("modules"), list):
-        for i, raw_mod in enumerate(raw["modules"]):
+    if isinstance(spec_data.get("modules"), list) and isinstance(spec.get("modules"), list):
+        for i, raw_mod in enumerate(spec_data["modules"]):
             if isinstance(raw_mod, dict) and i < len(spec["modules"]):
-                _apply_path_jinja(raw_mod, "name")
-                if "name" in raw_mod and isinstance(spec["modules"][i], dict):
-                    spec["modules"][i]["name"] = raw_mod["name"]
+                if isinstance(spec["modules"][i], dict):
+                    _apply_path_jinja(spec["modules"][i], "name", raw_mod)
 
     return spec
 
