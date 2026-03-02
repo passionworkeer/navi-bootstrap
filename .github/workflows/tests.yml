@@ -41,8 +41,15 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run tests
-        run: uv run pytest tests/ -v --cov=src/navi_bootstrap --cov-report=term-missing
+      - name: Run tests with coverage
+        run: |
+          uv run pytest tests/ -v --cov=src/navi_bootstrap --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=80
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67af1b5c587a882  # v5.4.3
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
 
   lint:
     runs-on: ubuntu-latest
@@ -79,3 +86,25 @@ jobs:
 
       - name: Type check
         run: uv run mypy src/navi_bootstrap/ --ignore-missing-imports
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e  # v2.10.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38  # v5.4.0
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies
+        run: uv sync
+      - name: pip-audit
+        run: uvx pip-audit==2.9.0
