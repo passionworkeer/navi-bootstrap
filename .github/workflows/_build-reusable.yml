@@ -34,7 +34,9 @@ jobs:
           fetch-depth: 0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@1edb52594c857e2b5b13128931090f0640537287  # v5.3.0
+        uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182  # v5.4.2
+        with:
+          enable-cache: true
 
       - name: Set up Python
         run: uv python install 3.12
@@ -43,7 +45,7 @@ jobs:
         run: uv sync
 
       - name: Install release tools
-        run: uv pip install cyclonedx-bom pip-licenses
+        run: uv pip install cyclonedx-bom==7.2.2 pip-licenses==5.5.1
 
       - name: Run test suite
         run: uv run pytest tests/ -x -q
@@ -107,7 +109,7 @@ jobs:
             licenses.txt
 
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: dist
           path: dist/

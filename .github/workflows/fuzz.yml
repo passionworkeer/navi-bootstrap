@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --frozen
-          uv pip install atheris
+          uv pip install atheris==3.0.0
       - name: Run fuzzer
         env:
           FUZZ_TARGET: ${{ matrix.target }}
