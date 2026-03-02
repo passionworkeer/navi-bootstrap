@@ -32,37 +32,46 @@ runs:
   using: 'composite'
   steps:
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38  # v5.4.0
       with:
         python-version: ${{ inputs.python-version }}
 
     - name: Install nboot
       shell: bash
-      run: pip install "${{ github.action_path }}"
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: pip install "$ACTION_PATH"
 
     - name: Resolve pack path
       id: pack
       shell: bash
+      env:
+        PACK: ${{ inputs.pack }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        PACK="${{ inputs.pack }}"
         if [ -d "$PACK" ]; then
           echo "path=$PACK" >> "$GITHUB_OUTPUT"
-        elif [ -d "${{ github.action_path }}/packs/$PACK" ]; then
-          echo "path=${{ github.action_path }}/packs/$PACK" >> "$GITHUB_OUTPUT"
+        elif [ -d "$ACTION_PATH/packs/$PACK" ]; then
+          echo "path=$ACTION_PATH/packs/$PACK" >> "$GITHUB_OUTPUT"
         else
-          echo "::error::Pack not found: $PACK (looked in ./$PACK and ${{ github.action_path }}/packs/$PACK)"
+          echo "::error::Pack not found: $PACK (looked in ./$PACK and $ACTION_PATH/packs/$PACK)"
           exit 1
         fi
 
     - name: Run drift check
       shell: bash
+      env:
+        SPEC: ${{ inputs.spec }}
+        PACK_PATH: ${{ steps.pack.outputs.path }}
+        TARGET: ${{ inputs.target }}
+        SKIP_RESOLVE: ${{ inputs.skip-resolve }}
       run: |
         ARGS=(
-          --spec "${{ inputs.spec }}"
-          --pack "${{ steps.pack.outputs.path }}"
-          --target "${{ inputs.target }}"
+          --spec "$SPEC"
+          --pack "$PACK_PATH"
+          --target "$TARGET"
         )
-        if [ "${{ inputs.skip-resolve }}" = "true" ]; then
+        if [ "$SKIP_RESOLVE" = "true" ]; then
           ARGS+=(--skip-resolve)
         fi
         nboot diff "${ARGS[@]}"
