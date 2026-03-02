@@ -1,0 +1,26 @@
+{%- set pv = spec.python_version | default("3.12") -%}
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "{{ spec.name }}"
+version = "{{ spec.version | default('0.1.0') }}"
+description = "{{ spec.description | default('') }}"
+requires-python = ">={{ pv }}"
+{% if spec.license is defined -%}
+license = "{{ spec.license }}"
+{% endif -%}
+{% if spec.author is defined -%}
+authors = [
+    { name = "{{ spec.author.name }}"{% if spec.author.email is defined %}, email = "{{ spec.author.email }}"{% endif %} },
+]
+{% endif -%}
+readme = "README.md"
+{% if spec.dependencies is defined and spec.dependencies.runtime is defined and spec.dependencies.runtime -%}
+dependencies = [
+{% for dep in spec.dependencies.runtime %}    "{{ dep }}",
+{% endfor %}]
+{% else -%}
+dependencies = []
+{% endif %}

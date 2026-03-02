@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +17,27 @@ from navi_bootstrap.engine import plan, render, render_to_files
 from navi_bootstrap.hooks import run_hooks
 from navi_bootstrap.init import inspect_project
 from navi_bootstrap.manifest import ManifestError, load_manifest
-from navi_bootstrap.packs import PackError, list_packs, resolve_pack
-from navi_bootstrap.resolve import ResolveError, resolve_action_shas
+from navi_bootstrap.packs import PackError, get_ordered_packs, list_packs, resolve_pack
+from navi_bootstrap.resolve import ResolveError, gh_available, resolve_action_shas
 from navi_bootstrap.sanitize import sanitize_manifest, sanitize_spec
-from navi_bootstrap.spec import SpecError, load_spec
+from navi_bootstrap.spec import SpecError, build_spec_for_new, load_spec
 from navi_bootstrap.validate import run_validations
+
+_GH_NOTICE = (
+    "Notice: gh CLI not found — SHA resolution requires gh "
+    "(https://cli.github.com).\n"
+    "  Action SHAs left as placeholders. Re-run without --skip-resolve after installing gh."
+)
+
+
+def _check_gh_or_skip(skip_resolve: bool) -> bool:
+    """Return effective skip_resolve, printing a notice if gh is unavailable."""
+    if skip_resolve:
+        return True
+    if not gh_available():
+        click.echo(_GH_NOTICE, err=True)
+        return True
+    return False
 
 
 @click.group()
@@ -92,9 +109,10 @@ def render_cmd(
         output_dir = out
 
     # Stage 0: Resolve SHAs
+    effective_skip = _check_gh_or_skip(skip_resolve or dry_run)
     action_shas_config = manifest.get("action_shas", [])
     try:
-        shas, versions = resolve_action_shas(action_shas_config, skip=skip_resolve or dry_run)
+        shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
     except ResolveError as e:
         raise click.ClickException(str(e)) from e
 
@@ -174,9 +192,10 @@ def apply(
     manifest = sanitize_manifest(manifest)
 
     # Stage 0: Resolve SHAs
+    effective_skip = _check_gh_or_skip(skip_resolve or dry_run)
     action_shas_config = manifest.get("action_shas", [])
     try:
-        shas, versions = resolve_action_shas(action_shas_config, skip=skip_resolve or dry_run)
+        shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
     except ResolveError as e:
         raise click.ClickException(str(e)) from e
 
@@ -265,9 +284,10 @@ def diff_cmd(spec: Path, pack: str, target: Path, skip_resolve: bool) -> None:
     manifest = sanitize_manifest(manifest)
 
     # Stage 0: Resolve SHAs
+    effective_skip = _check_gh_or_skip(skip_resolve)
     action_shas_config = manifest.get("action_shas", [])
     try:
-        shas, versions = resolve_action_shas(action_shas_config, skip=skip_resolve)
+        shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
     except ResolveError as e:
         raise click.ClickException(str(e)) from e
 
@@ -366,6 +386,128 @@ def init(target: Path, out: Path | None, yes: bool) -> None:
     out_path = out or (target / "nboot-spec.json")
     out_path.write_text(json.dumps(spec, indent=2) + "\n")
     click.echo(f"\nWrote {out_path}")
+
+
+@cli.command("new")
+@click.argument("name")
+@click.option("--description", default="", help="One-line project description")
+@click.option("--license", "license_id", default="MIT", help="SPDX license identifier")
+@click.option("--python-version", default="3.12", help="Minimum Python version")
+@click.option("--author", default="", help="Author name")
+@click.option("--packs", default=None, help="Comma-separated pack names (default: scaffold,base)")
+@click.option("--skip-resolve", is_flag=True, default=False, help="Skip SHA resolution (offline)")
+@click.option("--dry-run", is_flag=True, default=False, help="Show plan without writing files")
+def new(
+    name: str,
+    description: str,
+    license_id: str,
+    python_version: str,
+    author: str,
+    packs: str | None,
+    skip_resolve: bool,
+    dry_run: bool,
+) -> None:
+    """Create a new Python project with operational infrastructure."""
+    output_dir = Path(name)
+    if output_dir.exists():
+        raise click.ClickException(
+            f"Directory {name!r} already exists. nboot new is for greenfield projects only."
+        )
+
+    # Build spec from CLI args
+    try:
+        spec_data = build_spec_for_new(
+            name,
+            description=description,
+            license_id=license_id,
+            python_version=python_version,
+            author_name=author,
+        )
+    except SpecError as e:
+        raise click.ClickException(str(e)) from e
+    spec_data = sanitize_spec(spec_data)
+
+    # Resolve pack order
+    pack_names = packs.split(",") if packs else None
+    try:
+        pack_dirs = get_ordered_packs(pack_names)
+    except PackError as e:
+        raise click.ClickException(str(e)) from e
+
+    if dry_run:
+        click.echo(f"Dry run — would create {name}/")
+        click.echo(f"  Packs: {', '.join(p.name for p in pack_dirs)}")
+        for pack_dir in pack_dirs:
+            try:
+                manifest = load_manifest(pack_dir / "manifest.yaml")
+            except ManifestError as e:
+                raise click.ClickException(str(e)) from e
+            manifest = sanitize_manifest(manifest)
+            templates_dir = pack_dir / "templates"
+            render_plan = plan(manifest, spec_data, templates_dir)
+            click.echo(f"\n  [{manifest['name']}]")
+            for entry in render_plan.entries:
+                mode_tag = f" [{entry.mode}]" if entry.mode != "create" else ""
+                click.echo(f"    {entry.src} → {entry.dest}{mode_tag}")
+        return
+
+    # Render packs in order
+    effective_skip = _check_gh_or_skip(skip_resolve)
+    output_dir.mkdir(parents=True)
+    total_written: list[Path] = []
+
+    for i, pack_dir in enumerate(pack_dirs):
+        try:
+            manifest = load_manifest(pack_dir / "manifest.yaml")
+        except ManifestError as e:
+            raise click.ClickException(str(e)) from e
+        manifest = sanitize_manifest(manifest)
+
+        # Stage 0: Resolve SHAs
+        action_shas_config = manifest.get("action_shas", [])
+        try:
+            shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
+        except ResolveError as e:
+            raise click.ClickException(str(e)) from e
+
+        # Stage 2: Plan
+        templates_dir = pack_dir / "templates"
+        render_plan = plan(manifest, spec_data, templates_dir)
+
+        # Stage 3: Render — first pack is greenfield, subsequent packs apply
+        mode = "greenfield" if i == 0 else "apply"
+        try:
+            written = render(
+                render_plan,
+                spec_data,
+                templates_dir,
+                output_dir,
+                mode=mode,
+                action_shas=shas,
+                action_versions=versions,
+            )
+        except (FileExistsError, ValueError) as e:
+            raise click.ClickException(str(e)) from e
+
+        total_written.extend(written)
+        click.echo(f"  [{manifest['name']}] {len(written)} files")
+
+    # Write spec file
+    spec_path = output_dir / "nboot-spec.json"
+    spec_path.write_text(json.dumps(spec_data, indent=2) + "\n")
+
+    # Initialize git repo
+    subprocess.run(
+        ["git", "init"],
+        cwd=output_dir,
+        capture_output=True,
+        check=False,
+    )
+
+    click.echo(
+        f"\nCreated {name}/ — {len(total_written)} files from "
+        f"{len(pack_dirs)} pack{'s' if len(pack_dirs) != 1 else ''}"
+    )
 
 
 def _display_spec(spec: dict[str, Any]) -> None:
