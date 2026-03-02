@@ -5,10 +5,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/navi_bootstrap"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"packs" = "navi_bootstrap/packs"
+"schema" = "navi_bootstrap/schema"
+
 [project]
 name = "navi-bootstrap"
-version = "0.1.0"
-description = "Jinja2 rendering engine and template packs for bootstrapping projects to navi-os-grade posture"
+version = "0.1.1"
+description = "Jinja2 rendering engine and template packs for bootstrapping projects"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
@@ -19,12 +23,14 @@ authors = [
 dependencies = [
     "click>=8.1.0",
     "jinja2>=3.1.0",
-    "pyyaml>=6.0",
     "jsonschema>=4.20.0",
+    "navi-sanitize>=0.1.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
 nboot = "navi_bootstrap.cli:cli"
+navi-bootstrap = "navi_bootstrap.cli:cli"
 
 [dependency-groups]
 dev = [
