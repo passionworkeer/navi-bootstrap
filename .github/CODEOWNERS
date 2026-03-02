@@ -1,1 +1,14 @@
 * @Fieldnote-Echo
+
+# CI/CD and security — require explicit review
+/.github/workflows/ @Fieldnote-Echo
+/.github/CODEOWNERS @Fieldnote-Echo
+/action.yml @Fieldnote-Echo
+
+# Dependencies and build
+/pyproject.toml @Fieldnote-Echo
+/uv.lock @Fieldnote-Echo
+
+# Security baselines
+/.secrets.baseline @Fieldnote-Echo
+/.pre-commit-config.yaml @Fieldnote-Echo
