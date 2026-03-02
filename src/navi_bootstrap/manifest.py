@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 import yaml
@@ -20,7 +20,7 @@ class ManifestError(Exception):
 
 def _load_schema() -> dict[str, Any]:
     """Load the YAML schema for manifest validation."""
-    return yaml.safe_load(SCHEMA_PATH.read_text())
+    return cast(dict[str, Any], yaml.safe_load(SCHEMA_PATH.read_text()))
 
 
 def validate_manifest(manifest: dict[str, Any]) -> None:

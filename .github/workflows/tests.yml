@@ -85,7 +85,7 @@ jobs:
         run: uv run bandit -r src/navi_bootstrap -ll
 
       - name: Type check
-        run: uv run mypy src/navi_bootstrap/ --ignore-missing-imports
+        run: uv run mypy src/navi_bootstrap/
 
   security:
     runs-on: ubuntu-latest

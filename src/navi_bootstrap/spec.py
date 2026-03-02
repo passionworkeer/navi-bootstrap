@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 
@@ -20,7 +20,7 @@ class SpecError(Exception):
 
 def _load_schema() -> dict[str, Any]:
     """Load the JSON Schema for spec validation."""
-    return json.loads(SCHEMA_PATH.read_text())
+    return cast(dict[str, Any], json.loads(SCHEMA_PATH.read_text()))
 
 
 def validate_spec(spec: dict[str, Any]) -> None:
@@ -41,4 +41,4 @@ def load_spec(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         raise SpecError(f"Failed to parse spec JSON: {e}") from e
     validate_spec(spec)
-    return spec
+    return cast(dict[str, Any], spec)

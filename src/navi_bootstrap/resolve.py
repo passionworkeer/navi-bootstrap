@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from typing import Any
+from typing import Any, cast
 
 
 class ResolveError(Exception):
@@ -23,7 +23,7 @@ def _gh_api(endpoint: str) -> dict[str, Any]:
     )
     if result.returncode != 0:
         raise ResolveError(f"gh api failed for {endpoint}: {result.stderr}")
-    return json.loads(result.stdout)
+    return cast(dict[str, Any], json.loads(result.stdout))
 
 
 def _resolve_one(repo: str, tag: str) -> str:
@@ -36,9 +36,9 @@ def _resolve_one(repo: str, tag: str) -> str:
     if obj["type"] == "tag":
         deref_endpoint = f"repos/{repo}/git/tags/{obj['sha']}"
         tag_data = _gh_api(deref_endpoint)
-        return tag_data["object"]["sha"]
+        return str(tag_data["object"]["sha"])
 
-    return obj["sha"]
+    return str(obj["sha"])
 
 
 def resolve_action_shas(
