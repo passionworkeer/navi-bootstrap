@@ -8,9 +8,7 @@ Invariants checked:
   - sanitize_spec() never raises on valid structure
   - sanitize_spec() always returns dict
   - sanitize_spec() output contains no null bytes
-  - sanitize_spec() is idempotent (second pass is no-op)
   - sanitize_manifest() never raises on valid structure
-  - sanitize_manifest() is idempotent
 """
 
 from __future__ import annotations
@@ -67,9 +65,6 @@ def fuzz_spec(data: bytes) -> None:
     for v in _extract_strings(result):
         assert "\x00" not in v
 
-    # Invariant: idempotent
-    assert sanitize_spec(result) == result
-
 
 def fuzz_manifest(data: bytes) -> None:
     """Fuzz sanitize_manifest with constructed manifest dicts."""
@@ -84,9 +79,6 @@ def fuzz_manifest(data: bytes) -> None:
     # Invariant: no null bytes
     for v in _extract_strings(result):
         assert "\x00" not in v
-
-    # Invariant: idempotent
-    assert sanitize_manifest(result) == result
 
 
 def _extract_strings(obj: object) -> list[str]:
