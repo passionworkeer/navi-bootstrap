@@ -137,6 +137,47 @@ class TestRenderCommand:
         assert result.exit_code != 0
 
 
+class TestRenderWithPackName:
+    def test_render_with_pack_name(
+        self, runner: CliRunner, spec_file: Path, tmp_path: Path
+    ) -> None:
+        """Pack names (not just paths) work with the render command."""
+        out_dir = tmp_path / "output"
+        result = runner.invoke(
+            cli,
+            [
+                "render",
+                "--spec",
+                str(spec_file),
+                "--pack",
+                "base",
+                "--out",
+                str(out_dir),
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "dry run" in result.output.lower()
+
+    def test_render_with_invalid_pack_name(
+        self, runner: CliRunner, spec_file: Path, tmp_path: Path
+    ) -> None:
+        result = runner.invoke(
+            cli,
+            [
+                "render",
+                "--spec",
+                str(spec_file),
+                "--pack",
+                "nonexistent-pack",
+                "--out",
+                str(tmp_path / "out"),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Unknown pack" in result.output
+
+
 class TestApplyCommand:
     def test_apply_creates_files(
         self, runner: CliRunner, spec_file: Path, full_pack: Path, tmp_path: Path
@@ -179,3 +220,27 @@ class TestApplyCommand:
         )
         assert result.exit_code == 0
         assert not (target_dir / "README.md").exists()
+
+
+class TestListPacksCommand:
+    def test_list_packs(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["list-packs"])
+        assert result.exit_code == 0
+        assert "base" in result.output
+        assert "code-hygiene" in result.output
+        assert "security-scanning" in result.output
+
+    def test_list_packs_shows_all_seven(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["list-packs"])
+        assert result.exit_code == 0
+        expected = [
+            "base",
+            "code-hygiene",
+            "github-templates",
+            "quality-gates",
+            "release-pipeline",
+            "review-system",
+            "security-scanning",
+        ]
+        for name in expected:
+            assert name in result.output, f"Missing pack: {name}"

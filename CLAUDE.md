@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**navi-bootstrap** is a Jinja2 rendering engine and template packs for bootstrapping projects to navi-os-grade posture.
+**navi-bootstrap** is a Jinja2 rendering engine and template packs for bootstrapping projects.
 
 - **Language:** Python
 - **Python version:** >= 3.12

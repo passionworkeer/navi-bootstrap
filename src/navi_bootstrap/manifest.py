@@ -6,12 +6,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 import yaml
 
-SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "manifest-schema.yaml"
+
+def _find_schema(filename: str) -> Path:
+    """Find schema file — works in both installed wheel and editable install."""
+    # Installed wheel: navi_bootstrap/schema/
+    pkg_path = Path(__file__).parent / "schema" / filename
+    if pkg_path.exists():
+        return pkg_path
+    # Editable install: repo_root/schema/
+    dev_path = Path(__file__).parent.parent.parent / "schema" / filename
+    if dev_path.exists():
+        return dev_path
+    msg = f"Schema not found: {filename}"
+    raise FileNotFoundError(msg)
 
 
 class ManifestError(Exception):
@@ -20,7 +32,7 @@ class ManifestError(Exception):
 
 def _load_schema() -> dict[str, Any]:
     """Load the YAML schema for manifest validation."""
-    return yaml.safe_load(SCHEMA_PATH.read_text())
+    return cast(dict[str, Any], yaml.safe_load(_find_schema("manifest-schema.yaml").read_text()))
 
 
 def validate_manifest(manifest: dict[str, Any]) -> None:
