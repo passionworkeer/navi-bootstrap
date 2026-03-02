@@ -58,7 +58,7 @@ class TestFullPipelineHostileSpec:
             "language": "python",
             "description": "clean",
         }
-        with caplog.at_level(logging.WARNING, logger="navi_bootstrap.sanitize"):
+        with caplog.at_level(logging.WARNING, logger="navi_sanitize"):
             spec = sanitize_spec(spec)
 
         manifest = yaml.safe_load((hostile_pack / "manifest.yaml").read_text())
@@ -80,7 +80,7 @@ class TestFullPipelineHostileSpec:
             "language": "python",
             "description": "{{ config.SECRET_KEY }}",
         }
-        with caplog.at_level(logging.WARNING, logger="navi_bootstrap.sanitize"):
+        with caplog.at_level(logging.WARNING, logger="navi_sanitize"):
             spec = sanitize_spec(spec)
 
         manifest = yaml.safe_load((hostile_pack / "manifest.yaml").read_text())
@@ -101,7 +101,7 @@ class TestFullPipelineHostileSpec:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """The full hostile_spec fixture survives the pipeline."""
-        with caplog.at_level(logging.WARNING, logger="navi_bootstrap.sanitize"):
+        with caplog.at_level(logging.WARNING, logger="navi_sanitize"):
             clean_spec = sanitize_spec(hostile_spec)
 
         manifest = yaml.safe_load((hostile_pack / "manifest.yaml").read_text())
@@ -122,7 +122,7 @@ class TestFullPipelineHostileSpec:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Manifest with traversal dests is cleaned."""
-        with caplog.at_level(logging.WARNING, logger="navi_bootstrap.sanitize"):
+        with caplog.at_level(logging.WARNING, logger="navi_sanitize"):
             clean_manifest = sanitize_manifest(hostile_manifest)
 
         for template_entry in clean_manifest["templates"]:
@@ -144,7 +144,7 @@ class TestHostileSpecFixture:
     def test_fixture_file_sanitizes_clean(self, caplog: pytest.LogCaptureFixture) -> None:
         fixture_path = Path(__file__).parent / "fixtures" / "hostile-spec.json"
         spec = json.loads(fixture_path.read_text())
-        with caplog.at_level(logging.WARNING, logger="navi_bootstrap.sanitize"):
+        with caplog.at_level(logging.WARNING, logger="navi_sanitize"):
             result = sanitize_spec(spec)
 
         # Clean output produced
