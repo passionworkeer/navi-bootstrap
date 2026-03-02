@@ -11,7 +11,19 @@ from typing import Any, cast
 
 import jsonschema
 
-SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "spec-schema.json"
+
+def _find_schema(filename: str) -> Path:
+    """Find schema file — works in both installed wheel and editable install."""
+    # Installed wheel: navi_bootstrap/schema/
+    pkg_path = Path(__file__).parent / "schema" / filename
+    if pkg_path.exists():
+        return pkg_path
+    # Editable install: repo_root/schema/
+    dev_path = Path(__file__).parent.parent.parent / "schema" / filename
+    if dev_path.exists():
+        return dev_path
+    msg = f"Schema not found: {filename}"
+    raise FileNotFoundError(msg)
 
 
 class SpecError(Exception):
@@ -20,7 +32,7 @@ class SpecError(Exception):
 
 def _load_schema() -> dict[str, Any]:
     """Load the JSON Schema for spec validation."""
-    return cast(dict[str, Any], json.loads(SCHEMA_PATH.read_text()))
+    return cast(dict[str, Any], json.loads(_find_schema("spec-schema.json").read_text()))
 
 
 def validate_spec(spec: dict[str, Any]) -> None:

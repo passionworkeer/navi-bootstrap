@@ -16,6 +16,7 @@ from navi_bootstrap.engine import plan, render, render_to_files
 from navi_bootstrap.hooks import run_hooks
 from navi_bootstrap.init import inspect_project
 from navi_bootstrap.manifest import ManifestError, load_manifest
+from navi_bootstrap.packs import PackError, list_packs, resolve_pack
 from navi_bootstrap.resolve import ResolveError, resolve_action_shas
 from navi_bootstrap.sanitize import sanitize_manifest, sanitize_spec
 from navi_bootstrap.spec import SpecError, load_spec
@@ -25,13 +26,13 @@ from navi_bootstrap.validate import run_validations
 @click.group()
 @click.version_option()
 def cli() -> None:
-    """nboot — bootstrap projects to navi-os-grade posture."""
+    """nboot — bootstrap projects with template packs."""
 
 
 @cli.command()
 @click.option("--spec", required=True, type=click.Path(exists=True, path_type=Path))
-@click.option("--pack", type=click.Path(exists=True, path_type=Path), default=None)
-def validate(spec: Path, pack: Path | None) -> None:
+@click.option("--pack", type=str, default=None)
+def validate(spec: Path, pack: str | None) -> None:
     """Validate a spec (and optionally a pack manifest)."""
     try:
         load_spec(spec)
@@ -41,23 +42,32 @@ def validate(spec: Path, pack: Path | None) -> None:
 
     if pack:
         try:
-            load_manifest(pack / "manifest.yaml")
-            click.echo(f"Manifest valid: {pack / 'manifest.yaml'}")
+            pack_dir = resolve_pack(pack)
+        except PackError as e:
+            raise click.ClickException(str(e)) from e
+        try:
+            load_manifest(pack_dir / "manifest.yaml")
+            click.echo(f"Manifest valid: {pack_dir / 'manifest.yaml'}")
         except ManifestError as e:
             raise click.ClickException(str(e)) from e
 
 
 @cli.command("render")
 @click.option("--spec", required=True, type=click.Path(exists=True, path_type=Path))
-@click.option("--pack", required=True, type=click.Path(exists=True, path_type=Path))
+@click.option("--pack", required=True, type=str)
 @click.option("--out", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--skip-resolve", is_flag=True, default=False, help="Skip SHA resolution (offline)")
 @click.option("--trust", is_flag=True, default=False, help="Execute hooks from manifest (unsafe)")
 def render_cmd(
-    spec: Path, pack: Path, out: Path | None, dry_run: bool, skip_resolve: bool, trust: bool
+    spec: Path, pack: str, out: Path | None, dry_run: bool, skip_resolve: bool, trust: bool
 ) -> None:
     """Render a template pack into a new project (greenfield)."""
+    try:
+        pack_dir = resolve_pack(pack)
+    except PackError as e:
+        raise click.ClickException(str(e)) from e
+
     try:
         spec_data = load_spec(spec)
     except SpecError as e:
@@ -65,7 +75,7 @@ def render_cmd(
     spec_data = sanitize_spec(spec_data)
 
     try:
-        manifest = load_manifest(pack / "manifest.yaml")
+        manifest = load_manifest(pack_dir / "manifest.yaml")
     except ManifestError as e:
         raise click.ClickException(str(e)) from e
     manifest = sanitize_manifest(manifest)
@@ -89,7 +99,7 @@ def render_cmd(
         raise click.ClickException(str(e)) from e
 
     # Stage 2: Plan
-    templates_dir = pack / "templates"
+    templates_dir = pack_dir / "templates"
     render_plan = plan(manifest, spec_data, templates_dir)
 
     if dry_run:
@@ -133,7 +143,7 @@ def render_cmd(
 
 @cli.command()
 @click.option("--spec", required=True, type=click.Path(exists=True, path_type=Path))
-@click.option("--pack", required=True, type=click.Path(exists=True, path_type=Path))
+@click.option("--pack", required=True, type=str)
 @click.option(
     "--target", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path)
 )
@@ -143,9 +153,14 @@ def render_cmd(
     "--trust", is_flag=True, default=False, help="Execute hooks/validations from manifest (unsafe)"
 )
 def apply(
-    spec: Path, pack: Path, target: Path, dry_run: bool, skip_resolve: bool, trust: bool
+    spec: Path, pack: str, target: Path, dry_run: bool, skip_resolve: bool, trust: bool
 ) -> None:
     """Apply a template pack to an existing project."""
+    try:
+        pack_dir = resolve_pack(pack)
+    except PackError as e:
+        raise click.ClickException(str(e)) from e
+
     try:
         spec_data = load_spec(spec)
     except SpecError as e:
@@ -153,7 +168,7 @@ def apply(
     spec_data = sanitize_spec(spec_data)
 
     try:
-        manifest = load_manifest(pack / "manifest.yaml")
+        manifest = load_manifest(pack_dir / "manifest.yaml")
     except ManifestError as e:
         raise click.ClickException(str(e)) from e
     manifest = sanitize_manifest(manifest)
@@ -166,7 +181,7 @@ def apply(
         raise click.ClickException(str(e)) from e
 
     # Stage 2: Plan
-    templates_dir = pack / "templates"
+    templates_dir = pack_dir / "templates"
     render_plan = plan(manifest, spec_data, templates_dir)
 
     if dry_run:
@@ -225,13 +240,18 @@ def apply(
 
 @cli.command("diff")
 @click.option("--spec", required=True, type=click.Path(exists=True, path_type=Path))
-@click.option("--pack", required=True, type=click.Path(exists=True, path_type=Path))
+@click.option("--pack", required=True, type=str)
 @click.option(
     "--target", required=True, type=click.Path(exists=True, file_okay=False, path_type=Path)
 )
 @click.option("--skip-resolve", is_flag=True, default=False, help="Skip SHA resolution (offline)")
-def diff_cmd(spec: Path, pack: Path, target: Path, skip_resolve: bool) -> None:
+def diff_cmd(spec: Path, pack: str, target: Path, skip_resolve: bool) -> None:
     """Preview what a pack would change without writing anything."""
+    try:
+        pack_dir = resolve_pack(pack)
+    except PackError as e:
+        raise click.ClickException(str(e)) from e
+
     try:
         spec_data = load_spec(spec)
     except SpecError as e:
@@ -239,7 +259,7 @@ def diff_cmd(spec: Path, pack: Path, target: Path, skip_resolve: bool) -> None:
     spec_data = sanitize_spec(spec_data)
 
     try:
-        manifest = load_manifest(pack / "manifest.yaml")
+        manifest = load_manifest(pack_dir / "manifest.yaml")
     except ManifestError as e:
         raise click.ClickException(str(e)) from e
     manifest = sanitize_manifest(manifest)
@@ -252,7 +272,7 @@ def diff_cmd(spec: Path, pack: Path, target: Path, skip_resolve: bool) -> None:
         raise click.ClickException(str(e)) from e
 
     # Stage 2: Plan
-    templates_dir = pack / "templates"
+    templates_dir = pack_dir / "templates"
     render_plan = plan(manifest, spec_data, templates_dir)
 
     # Stage 3: Render to memory (no filesystem writes)
@@ -279,6 +299,17 @@ def diff_cmd(spec: Path, pack: Path, target: Path, skip_resolve: bool) -> None:
     n = len(diffs)
     click.echo(f"\n{n} file{'s' if n != 1 else ''} would change.")
     raise SystemExit(1)
+
+
+@cli.command("list-packs")
+def list_packs_cmd() -> None:
+    """List all bundled template packs."""
+    packs = list_packs()
+    if not packs:
+        click.echo("No bundled packs found.")
+        return
+    for p in packs:
+        click.echo(f"  {p.name:<25} v{p.version:<10} {p.description}")
 
 
 @cli.command()
