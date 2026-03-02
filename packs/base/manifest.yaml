@@ -87,7 +87,7 @@ validation:
     method: sha_verification
 
 decisions:
-  - question: "Which navi-os patterns apply to this project's domain?"
+  - question: "Which patterns apply to this project's domain?"
     context: "Not all security/quality patterns fit every project size and type."
   - question: "Are there pre-existing lint violations to document?"
     context: "Run ruff/mypy before committing. Document findings, don't fix them."

@@ -1,7 +1,7 @@
 # ruff: noqa: RUF003
 """Hostile payloads for adversarial testing of navi-bootstrap.
 
-Adapted from navi-os INJECTION_PAYLOADS. Each payload targets a specific
+Each payload targets a specific
 attack vector in the rendering pipeline. Every test asserts TWO things:
 (1) clean output produced, (2) warning emitted.
 """

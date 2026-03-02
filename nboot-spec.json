@@ -1,7 +1,7 @@
 {
   "name": "navi-bootstrap",
-  "version": "0.1.0",
-  "description": "Jinja2 rendering engine and template packs for bootstrapping projects to navi-os-grade posture",
+  "version": "0.1.1",
+  "description": "Jinja2 rendering engine and template packs for bootstrapping projects",
   "license": "MIT",
   "language": "python",
   "python_version": "3.12",
@@ -19,7 +19,6 @@
     "runtime": ["click", "jinja2", "pyyaml", "jsonschema"],
     "dev": [
       "pytest", "pytest-cov", "ruff", "mypy", "bandit",
-      "agno", "lancedb", "PyGithub", "sqlalchemy",
       "types-jsonschema", "types-PyYAML"
     ],
     "optional": {}
@@ -32,7 +31,7 @@
 
   "github": {
     "org": "Project-Navi",
-    "repo": "repo"
+    "repo": "navi-bootstrap"
   },
 
   "release": {
@@ -41,14 +40,13 @@
 
   "recon": {
     "test_framework": "pytest",
-    "test_count": 490,
-    "coverage_pct": 89,
+    "test_count": 325,
+    "coverage_pct": 93,
     "python_test_versions": ["3.12", "3.13"],
     "codeql_languages": ["python"],
     "existing_ci": [
       "_build-reusable.yml",
       "codeql.yml",
-      "grippy-review.yml",
       "release.yml",
       "scorecard.yml",
       "tests.yml"
@@ -62,6 +60,6 @@
     },
     "has_pyproject_toml": true,
     "has_github_dir": true,
-    "updated_at": "2026-02-27T00:00:00+00:00"
+    "updated_at": "2026-02-28T00:00:00+00:00"
   }
 }
