@@ -11,7 +11,7 @@ packages = ["src/navi_bootstrap"]
 
 [project]
 name = "navi-bootstrap"
-version = "0.1.1"
+version = "0.1.2"
 description = "Jinja2 rendering engine and template packs for bootstrapping projects"
 readme = "README.md"
 license = "MIT"
