@@ -3,6 +3,7 @@
 [![Tests](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/tests.yml/badge.svg)](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/tests.yml)
 [![CodeQL](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/codeql.yml/badge.svg)](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/codeql.yml)
 [![Fuzz](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/fuzz.yml/badge.svg)](https://github.com/Project-Navi/navi-bootstrap/actions/workflows/fuzz.yml)
+[![codecov](https://codecov.io/gh/Project-Navi/navi-bootstrap/graph/badge.svg?token=PJ9F194alS)](https://codecov.io/gh/Project-Navi/navi-bootstrap)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Project-Navi/navi-bootstrap/badge)](https://scorecard.dev/viewer/?uri=github.com/Project-Navi/navi-bootstrap)
 [![PyPI](https://img.shields.io/pypi/v/navi-bootstrap)](https://pypi.org/project/navi-bootstrap/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
