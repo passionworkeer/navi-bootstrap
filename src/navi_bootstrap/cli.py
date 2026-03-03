@@ -6,11 +6,13 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import click
+import jinja2
 
 from navi_bootstrap.diff import compute_diffs
 from navi_bootstrap.engine import plan, render, render_to_files
@@ -118,7 +120,10 @@ def render_cmd(
 
     # Stage 2: Plan
     templates_dir = pack_dir / "templates"
-    render_plan = plan(manifest, spec_data, templates_dir)
+    try:
+        render_plan = plan(manifest, spec_data, templates_dir)
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
 
     if dry_run:
         click.echo("Dry run — render plan:")
@@ -141,6 +146,8 @@ def render_cmd(
         )
     except FileExistsError as e:
         raise click.ClickException(str(e)) from e
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
 
     click.echo(f"Rendered {len(written)} files to {output_dir}")
 
@@ -201,7 +208,10 @@ def apply(
 
     # Stage 2: Plan
     templates_dir = pack_dir / "templates"
-    render_plan = plan(manifest, spec_data, templates_dir)
+    try:
+        render_plan = plan(manifest, spec_data, templates_dir)
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
 
     if dry_run:
         click.echo("Dry run — render plan:")
@@ -211,15 +221,18 @@ def apply(
         return
 
     # Stage 3: Render
-    written = render(
-        render_plan,
-        spec_data,
-        templates_dir,
-        target,
-        mode="apply",
-        action_shas=shas,
-        action_versions=versions,
-    )
+    try:
+        written = render(
+            render_plan,
+            spec_data,
+            templates_dir,
+            target,
+            mode="apply",
+            action_shas=shas,
+            action_versions=versions,
+        )
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
     click.echo(f"Applied {len(written)} files to {target}")
 
     # Stage 4: Validate + Stage 5: Hooks
@@ -293,16 +306,22 @@ def diff_cmd(spec: Path, pack: str, target: Path, skip_resolve: bool) -> None:
 
     # Stage 2: Plan
     templates_dir = pack_dir / "templates"
-    render_plan = plan(manifest, spec_data, templates_dir)
+    try:
+        render_plan = plan(manifest, spec_data, templates_dir)
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
 
     # Stage 3: Render to memory (no filesystem writes)
-    rendered_files = render_to_files(
-        render_plan,
-        spec_data,
-        templates_dir,
-        action_shas=shas,
-        action_versions=versions,
-    )
+    try:
+        rendered_files = render_to_files(
+            render_plan,
+            spec_data,
+            templates_dir,
+            action_shas=shas,
+            action_versions=versions,
+        )
+    except (jinja2.TemplateError, TypeError) as e:
+        raise click.ClickException(f"Template error: {e}") from e
 
     # Compute diffs
     diffs = compute_diffs(rendered_files, target, pack_name=render_plan.pack_name)
@@ -408,6 +427,12 @@ def new(
     dry_run: bool,
 ) -> None:
     """Create a new Python project with operational infrastructure."""
+    # Validate name before using as path
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        raise click.ClickException(
+            f"Unsafe project name {name!r}. "
+            "Names must not contain path separators or start with a dot."
+        )
     output_dir = Path(name)
     if output_dir.exists():
         raise click.ClickException(
@@ -444,7 +469,10 @@ def new(
                 raise click.ClickException(str(e)) from e
             manifest = sanitize_manifest(manifest)
             templates_dir = pack_dir / "templates"
-            render_plan = plan(manifest, spec_data, templates_dir)
+            try:
+                render_plan = plan(manifest, spec_data, templates_dir)
+            except (jinja2.TemplateError, TypeError) as e:
+                raise click.ClickException(f"Template error: {e}") from e
             click.echo(f"\n  [{manifest['name']}]")
             for entry in render_plan.entries:
                 mode_tag = f" [{entry.mode}]" if entry.mode != "create" else ""
@@ -456,53 +484,65 @@ def new(
     output_dir.mkdir(parents=True)
     total_written: list[Path] = []
 
-    for i, pack_dir in enumerate(pack_dirs):
-        try:
-            manifest = load_manifest(pack_dir / "manifest.yaml")
-        except ManifestError as e:
-            raise click.ClickException(str(e)) from e
-        manifest = sanitize_manifest(manifest)
+    try:
+        for i, pack_dir in enumerate(pack_dirs):
+            try:
+                manifest = load_manifest(pack_dir / "manifest.yaml")
+            except ManifestError as e:
+                raise click.ClickException(str(e)) from e
+            manifest = sanitize_manifest(manifest)
 
-        # Stage 0: Resolve SHAs
-        action_shas_config = manifest.get("action_shas", [])
-        try:
-            shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
-        except ResolveError as e:
-            raise click.ClickException(str(e)) from e
+            # Stage 0: Resolve SHAs
+            action_shas_config = manifest.get("action_shas", [])
+            try:
+                shas, versions = resolve_action_shas(action_shas_config, skip=effective_skip)
+            except ResolveError as e:
+                raise click.ClickException(str(e)) from e
 
-        # Stage 2: Plan
-        templates_dir = pack_dir / "templates"
-        render_plan = plan(manifest, spec_data, templates_dir)
+            # Stage 2: Plan
+            templates_dir = pack_dir / "templates"
+            try:
+                render_plan = plan(manifest, spec_data, templates_dir)
+            except (jinja2.TemplateError, TypeError) as e:
+                raise click.ClickException(f"Template error: {e}") from e
 
-        # Stage 3: Render — first pack is greenfield, subsequent packs apply
-        mode = "greenfield" if i == 0 else "apply"
-        try:
-            written = render(
-                render_plan,
-                spec_data,
-                templates_dir,
-                output_dir,
-                mode=mode,
-                action_shas=shas,
-                action_versions=versions,
-            )
-        except (FileExistsError, ValueError) as e:
-            raise click.ClickException(str(e)) from e
+            # Stage 3: Render — first pack is greenfield, subsequent packs apply
+            mode = "greenfield" if i == 0 else "apply"
+            try:
+                written = render(
+                    render_plan,
+                    spec_data,
+                    templates_dir,
+                    output_dir,
+                    mode=mode,
+                    action_shas=shas,
+                    action_versions=versions,
+                )
+            except (FileExistsError, ValueError) as e:
+                raise click.ClickException(str(e)) from e
+            except (jinja2.TemplateError, TypeError) as e:
+                raise click.ClickException(f"Template error: {e}") from e
 
-        total_written.extend(written)
-        click.echo(f"  [{manifest['name']}] {len(written)} files")
+            total_written.extend(written)
+            click.echo(f"  [{manifest['name']}] {len(written)} files")
 
-    # Write spec file
-    spec_path = output_dir / "nboot-spec.json"
-    spec_path.write_text(json.dumps(spec_data, indent=2) + "\n")
+        # Write spec file
+        spec_path = output_dir / "nboot-spec.json"
+        spec_path.write_text(json.dumps(spec_data, indent=2) + "\n")
 
-    # Initialize git repo
-    subprocess.run(
-        ["git", "init"],
-        cwd=output_dir,
-        capture_output=True,
-        check=False,
-    )
+        # Initialize git repo
+        subprocess.run(
+            ["git", "init"],
+            cwd=output_dir,
+            capture_output=True,
+            check=False,
+        )
+    except click.ClickException:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        raise
+    except (jinja2.TemplateError, TypeError) as e:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        raise click.ClickException(f"Template error: {e}") from e
 
     click.echo(
         f"\nCreated {name}/ — {len(total_written)} files from "

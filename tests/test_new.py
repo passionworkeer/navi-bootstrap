@@ -182,8 +182,49 @@ class TestNbootNew:
             toml_content = (Path("my-project") / "pyproject.toml").read_text()
             assert "A cool project" in toml_content
 
+    def test_no_license_file_for_non_mit(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Non-MIT license skips LICENSE file generation."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                cli,
+                [
+                    "new",
+                    "my-project",
+                    "--skip-resolve",
+                    "--license",
+                    "Apache-2.0",
+                    "--packs",
+                    "scaffold",
+                ],
+            )
+            assert result.exit_code == 0, result.output
+            assert not (Path("my-project") / "LICENSE").exists()
+            # But spec still has the license
+            spec = json.loads((Path("my-project") / "nboot-spec.json").read_text())
+            assert spec["license"] == "Apache-2.0"
+
+    def test_license_file_for_mit(self, runner: CliRunner, tmp_path: Path) -> None:
+        """MIT license generates LICENSE file."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                cli,
+                [
+                    "new",
+                    "my-project",
+                    "--skip-resolve",
+                    "--license",
+                    "MIT",
+                    "--packs",
+                    "scaffold",
+                ],
+            )
+            assert result.exit_code == 0, result.output
+            assert (Path("my-project") / "LICENSE").exists()
+            content = (Path("my-project") / "LICENSE").read_text()
+            assert "MIT License" in content
+
     def test_with_license(self, runner: CliRunner, tmp_path: Path) -> None:
-        """--license sets the license in spec and renders LICENSE file."""
+        """--license is persisted in spec; LICENSE generation is MIT-only."""
         with runner.isolated_filesystem(temp_dir=tmp_path):
             result = runner.invoke(
                 cli,
@@ -253,6 +294,51 @@ class TestNbootNew:
             assert "[tool.ruff]" not in content
             assert "[tool.mypy]" not in content
             assert "[dependency-groups]" not in content
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "../traversal",
+            "foo/bar",
+            "foo\\bar",
+            ".hidden",
+            "..double",
+        ],
+    )
+    def test_rejects_unsafe_names(self, runner: CliRunner, tmp_path: Path, name: str) -> None:
+        """nboot new rejects names with path separators or leading dots."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(cli, ["new", name, "--skip-resolve"])
+            assert result.exit_code != 0
+            assert "Unsafe project name" in result.output
+
+    def test_cleans_up_on_failure(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Failed nboot new removes partial directory."""
+        # Create a broken pack that will fail mid-render
+        bad_pack = tmp_path / "badpack"
+        bad_pack.mkdir()
+        templates_dir = bad_pack / "templates"
+        templates_dir.mkdir()
+
+        manifest = {
+            "name": "broken",
+            "version": "0.1.0",
+            "templates": [{"src": "out.j2", "dest": "out.txt"}],
+            "conditions": {},
+            "loops": {},
+        }
+        import yaml
+
+        (bad_pack / "manifest.yaml").write_text(yaml.dump(manifest))
+        (templates_dir / "out.j2").write_text("{{ undefined_var }}")
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                cli, ["new", "myproj", "--skip-resolve", "--packs", str(bad_pack)]
+            )
+            assert result.exit_code != 0
+            # Directory should be cleaned up
+            assert not Path("myproj").exists()
 
     @patch("navi_bootstrap.cli.gh_available", return_value=False)
     def test_graceful_degradation_without_gh(
