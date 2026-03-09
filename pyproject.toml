@@ -43,6 +43,10 @@ dev = [
     "types-PyYAML>=6.0",
 ]
 
+docs = [
+    "zensical>=0.0.24",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
